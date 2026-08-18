@@ -6,7 +6,7 @@
       "name": "backend",
       "plan": "free",
       "runtime": "node",
-      "buildCommand": "npm install && npm run build && npx prisma generate",
+      "buildCommand": "npm install && npm run build && npx prisma generate && npx prisma db push --skip-generate --accept-data-loss && npm run prisma:seed",
       "startCommand": "node dist/index.js",
       "envVars": [
         {
