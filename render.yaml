@@ -7,7 +7,7 @@
       "plan": "free",
       "runtime": "node",
       "rootDir": "backend",
-      "buildCommand": "cd backend && npm install --legacy-peer-deps && npm run build && npx prisma generate && npx prisma db push --skip-generate --accept-data-loss && npm run prisma:seed",
+      "buildCommand": "cd backend ; npm install --legacy-peer-deps ; npm run build ; npx prisma generate ; npx prisma db push --skip-generate --accept-data-loss ; npm run prisma:seed",
       "startCommand": "cd backend && node dist/index.js",
       "envVars": [
         {
