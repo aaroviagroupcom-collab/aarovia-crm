@@ -4,8 +4,7 @@ import { LeadStatus, LeadSource, Role } from '@prisma/client';
 import prisma from '../config/database';
 import { AppError } from '../middleware/errorHandler';
 import { AuthRequest } from '../middleware/auth';
-import { logActivity } from '../services/activity.service';
-import { sendFollowupReminder } from '../services/notification.service';
+import { logActivity, sendFollowupReminder } from '../services/activity.service';
 import { hasMinRole } from '../middleware/auth';
 
 const leadSchema = z.object({
@@ -136,15 +135,17 @@ export const createLead = async (req: AuthRequest, res: Response, next: NextFunc
       user.role === Role.SALES_EXECUTIVE ? user.id : await autoAssignLead()
     );
 
+    const leadInput: any = {
+      ...data,
+      budget: data.budget ? data.budget : undefined,
+      followupDate: data.followupDate ? new Date(data.followupDate) : undefined,
+      assignedTo,
+      createdById: user.id,
+      isDuplicate: !!duplicate,
+    };
+
     const lead = await prisma.lead.create({
-      data: {
-        ...data,
-        budget: data.budget ? data.budget : undefined,
-        followupDate: data.followupDate ? new Date(data.followupDate) : undefined,
-        assignedTo,
-        createdById: user.id,
-        isDuplicate: !!duplicate,
-      },
+      data: leadInput,
       include: {
         executive: { select: { id: true, name: true } },
         project: { select: { id: true, name: true } },
@@ -178,13 +179,15 @@ export const updateLead = async (req: AuthRequest, res: Response, next: NextFunc
     const existing = await prisma.lead.findUnique({ where: { id: req.params.id } });
     if (!existing) throw new AppError('Lead not found', 404);
 
+    const leadInput: any = {
+      ...data,
+      budget: data.budget !== undefined ? data.budget : undefined,
+      followupDate: data.followupDate ? new Date(data.followupDate) : undefined,
+    };
+
     const lead = await prisma.lead.update({
       where: { id: req.params.id },
-      data: {
-        ...data,
-        budget: data.budget !== undefined ? data.budget : undefined,
-        followupDate: data.followupDate ? new Date(data.followupDate) : undefined,
-      },
+      data: leadInput,
       include: {
         executive: { select: { id: true, name: true } },
         project: { select: { id: true, name: true } },
@@ -316,15 +319,17 @@ export const bulkImportLeads = async (req: AuthRequest, res: Response, next: Nex
         const parsed = leadSchema.parse(leadData);
         const duplicate = await prisma.lead.findFirst({ where: { mobile: parsed.mobile } });
 
+        const leadInput: any = {
+          ...parsed,
+          budget: parsed.budget ? parsed.budget : undefined,
+          followupDate: parsed.followupDate ? new Date(parsed.followupDate) : undefined,
+          assignedTo: parsed.assignedTo || user.id,
+          createdById: user.id,
+          isDuplicate: !!duplicate,
+        };
+
         await prisma.lead.create({
-          data: {
-            ...parsed,
-            budget: parsed.budget ? parsed.budget : undefined,
-            followupDate: parsed.followupDate ? new Date(parsed.followupDate) : undefined,
-            assignedTo: parsed.assignedTo || user.id,
-            createdById: user.id,
-            isDuplicate: !!duplicate,
-          },
+          data: leadInput,
         });
         if (duplicate) duplicates++;
         else imported++;

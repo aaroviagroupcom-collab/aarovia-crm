@@ -51,6 +51,7 @@ router.get('/executive-performance', async (_req, res, next) => {
     const data = await prisma.user.findMany({
       where: { role: { in: ['SALES_EXECUTIVE', 'TEAM_LEADER'] }, isActive: true },
       select: {
+        id: true,
         name: true,
         _count: { select: { leads: true } },
       },
@@ -59,7 +60,7 @@ router.get('/executive-performance', async (_req, res, next) => {
     const result = await Promise.all(
       data.map(async (u) => {
         const bookingCount = await prisma.booking.count({
-          where: { lead: { assignedToId: (await prisma.user.findFirst({ where: { name: u.name }, select: { id: true } }))?.id } },
+          where: { lead: { assignedTo: u.id } },
         });
         return { name: u.name, leads: u._count.leads, bookings: bookingCount, revenue: 0 };
       })

@@ -5,8 +5,7 @@ import PDFDocument from 'pdfkit';
 import prisma from '../config/database';
 import { AppError } from '../middleware/errorHandler';
 import { AuthRequest } from '../middleware/auth';
-import { logActivity } from '../services/activity.service';
-import { sendNotification } from '../services/notification.service';
+import { logActivity, sendNotification } from '../services/activity.service';
 
 const bookingSchema = z.object({
   leadId: z.string(),
