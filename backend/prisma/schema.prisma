@@ -1,0 +1,512 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  SUPER_ADMIN
+  ADMIN
+  SALES_MANAGER
+  TEAM_LEADER
+  SALES_EXECUTIVE
+  POST_SALES_EXECUTIVE
+  ACCOUNTS
+  MARKETING
+  CHANNEL_PARTNER
+}
+
+enum LeadStatus {
+  NEW
+  FOLLOWUP
+  RNR
+  CALL_BACK
+  INTERESTED
+  QUALIFIED
+  SITE_VISIT_FIXED
+  SITE_VISIT_DONE
+  OPPORTUNITY
+  OPPORTUNITY_FOLLOW
+  OPPORTUNITY_INTERESTED
+  OPPORTUNITY_NOT_INTERESTED
+  OPPORTUNITY_CLOSED
+  BOOKED
+}
+
+enum LeadSource {
+  MAGICBRICKS
+  FACEBOOK
+  ACRES_99
+  WEBSITE
+  CALL
+  WALK_IN
+  REFERRAL
+  WHATSAPP
+  GOOGLE_ADS
+  HOUSING_COM
+}
+
+enum ProjectType {
+  APARTMENT
+  VILLA
+  PLOT
+  FARM_LAND
+  COMMERCIAL
+  MIXED_DEVELOPMENT
+}
+
+enum InventoryStatus {
+  AVAILABLE
+  BLOCKED
+  SOLD
+  RESERVED
+}
+
+enum QuotationType {
+  PLOT
+  VILLA
+  APARTMENT
+  FARM_LAND
+  COMMERCIAL
+}
+
+enum QuotationStatus {
+  DRAFT
+  PENDING_MANAGER
+  PENDING_ADMIN
+  APPROVED
+  REJECTED
+}
+
+enum BookingStage {
+  BOOKING
+  AGREEMENT_PENDING
+  AGREEMENT_INITIATED
+  AGREEMENT_SIGNED
+  REGISTRATION_PENDING
+  REGISTERED
+  HANDOVER_PENDING
+  HANDOVER_COMPLETE
+}
+
+enum PaymentMode {
+  CASH
+  UPI
+  NEFT
+  RTGS
+  CHEQUE
+  CARD
+}
+
+enum InvoiceType {
+  BOOKING
+  DEMAND
+  TAX
+  FINAL
+}
+
+enum NotificationType {
+  EMAIL
+  WHATSAPP
+  SMS
+  IN_APP
+}
+
+model User {
+  id              String    @id @default(cuid())
+  name            String
+  email           String    @unique
+  phone           String?
+  password        String
+  role            Role
+  isActive        Boolean   @default(true)
+  teamLeaderId    String?
+  teamLeader      User?     @relation("TeamMembers", fields: [teamLeaderId], references: [id])
+  teamMembers     User[]    @relation("TeamMembers")
+  avatar          String?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  leads           Lead[]    @relation("AssignedLeads")
+  createdLeads    Lead[]    @relation("CreatedLeads")
+  activities      ActivityLog[]
+  notifications   Notification[]
+  callLogs        CallLog[]
+  quotations      Quotation[]
+  sessions        Session[]
+
+  @@index([email])
+  @@index([role])
+}
+
+model Session {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  token     String   @unique
+  ip        String?
+  userAgent String?
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@index([token])
+  @@index([userId])
+}
+
+model Project {
+  id          String      @id @default(cuid())
+  name        String
+  location    String
+  type        ProjectType
+  reraNumber  String?
+  description String?
+  amenities   String[]
+  gallery     String[]
+  brochure    String?
+  floorPlans  String[]
+  priceSheet  String?
+  paymentPlan String?
+  isActive    Boolean     @default(true)
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  inventory   Inventory[]
+  leads       Lead[]
+  quotations  Quotation[]
+
+  @@index([name])
+}
+
+model Inventory {
+  id          String          @id @default(cuid())
+  unitNumber  String
+  block       String?
+  tower       String?
+  floor       Int?
+  area        Decimal         @db.Decimal(10, 2)
+  facing      String?
+  type        String
+  rate        Decimal         @db.Decimal(12, 2)
+  plc         Decimal?        @db.Decimal(12, 2)
+  gst         Decimal?        @db.Decimal(5, 2)
+  status      InventoryStatus @default(AVAILABLE)
+  projectId   String
+  project     Project         @relation(fields: [projectId], references: [id])
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+
+  quotations  Quotation[]
+  bookings    Booking[]
+
+  @@unique([projectId, unitNumber])
+  @@index([projectId])
+  @@index([status])
+}
+
+model Lead {
+  id              String      @id @default(cuid())
+  leadId          String      @unique @default(cuid())
+  customerName    String
+  mobile          String
+  alternateMobile String?
+  email           String?
+  city            String?
+  state           String?
+  source          LeadSource
+  status          LeadStatus  @default(NEW)
+  projectId       String?
+  project         Project?    @relation(fields: [projectId], references: [id])
+  budget          Decimal?    @db.Decimal(12, 2)
+  configuration   String?
+  assignedTo      String?
+  executive       User?       @relation("AssignedLeads", fields: [assignedTo], references: [id])
+  createdById     String
+  createdBy       User        @relation("CreatedLeads", fields: [createdById], references: [id])
+  notes           String?
+  followupDate    DateTime?
+  isDuplicate     Boolean     @default(false)
+  mergedIntoId    String?
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+
+  documents       Document[]
+  communications  Communication[]
+  callLogs        CallLog[]
+  quotations      Quotation[]
+  bookings        Booking[]
+  timeline        LeadTimeline[]
+  reminders       Reminder[]
+
+  @@index([mobile])
+  @@index([status])
+  @@index([assignedTo])
+  @@index([source])
+  @@index([createdAt])
+}
+
+model LeadTimeline {
+  id          String     @id @default(cuid())
+  leadId      String
+  lead        Lead       @relation(fields: [leadId], references: [id])
+  action      String
+  description String?
+  previousStatus LeadStatus?
+  newStatus   LeadStatus?
+  createdById String
+  createdAt   DateTime   @default(now())
+
+  @@index([leadId])
+}
+
+model Communication {
+  id        String   @id @default(cuid())
+  leadId    String
+  lead      Lead     @relation(fields: [leadId], references: [id])
+  type      String   // EMAIL, WHATSAPP, SMS
+  subject   String?
+  body      String
+  status    String   // SENT, DELIVERED, OPENED, REPLIED
+  sentAt    DateTime @default(now())
+  metadata  Json?
+
+  @@index([leadId])
+  @@index([type])
+}
+
+model CallLog {
+  id          String   @id @default(cuid())
+  leadId      String
+  lead        Lead     @relation(fields: [leadId], references: [id])
+  userId      String
+  user        User     @relation(fields: [userId], references: [id])
+  duration    Int?     // seconds
+  recording   String?
+  notes       String?
+  status      String   // ANSWERED, MISSED, BUSY
+  callSid     String?  // Twilio SID
+  calledAt    DateTime @default(now())
+
+  @@index([leadId])
+  @@index([userId])
+}
+
+model Reminder {
+  id          String    @id @default(cuid())
+  leadId      String
+  lead        Lead      @relation(fields: [leadId], references: [id])
+  title       String
+  description String?
+  dueDate     DateTime
+  isDone      Boolean   @default(false)
+  createdById String
+  createdAt   DateTime  @default(now())
+
+  @@index([leadId])
+  @@index([dueDate])
+}
+
+model Quotation {
+  id            String          @id @default(cuid())
+  quotationNo   String          @unique
+  leadId        String
+  lead          Lead            @relation(fields: [leadId], references: [id])
+  inventoryId   String?
+  inventory     Inventory?      @relation(fields: [inventoryId], references: [id])
+  projectId     String
+  project       Project         @relation(fields: [projectId], references: [id])
+  type          QuotationType
+  status        QuotationStatus @default(DRAFT)
+  basicCost     Decimal         @db.Decimal(14, 2)
+  plcAmount     Decimal?        @db.Decimal(14, 2)
+  gstAmount     Decimal?        @db.Decimal(14, 2)
+  discount      Decimal?        @db.Decimal(14, 2)
+  finalCost     Decimal         @db.Decimal(14, 2)
+  area          Decimal         @db.Decimal(10, 2)
+  rate          Decimal         @db.Decimal(12, 2)
+  validUntil    DateTime?
+  createdById   String
+  createdBy     User            @relation(fields: [createdById], references: [id])
+  approvedById  String?
+  approvedAt    DateTime?
+  pdfUrl        String?
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+
+  milestones    PaymentMilestone[]
+  booking       Booking?
+
+  @@index([leadId])
+  @@index([status])
+}
+
+model PaymentMilestone {
+  id            String    @id @default(cuid())
+  quotationId   String
+  quotation     Quotation @relation(fields: [quotationId], references: [id])
+  name          String
+  percentage    Decimal   @db.Decimal(5, 2)
+  amount        Decimal   @db.Decimal(14, 2)
+  dueDate       DateTime?
+  isPaid        Boolean   @default(false)
+  paidAt        DateTime?
+
+  @@index([quotationId])
+}
+
+model Booking {
+  id              String       @id @default(cuid())
+  bookingNo       String       @unique
+  leadId          String
+  lead            Lead         @relation(fields: [leadId], references: [id])
+  inventoryId     String
+  inventory       Inventory    @relation(fields: [inventoryId], references: [id])
+  quotationId     String?      @unique
+  quotation       Quotation?   @relation(fields: [quotationId], references: [id])
+  bookingAmount   Decimal      @db.Decimal(14, 2)
+  paymentMode     PaymentMode
+  bookingDate     DateTime
+  stage           BookingStage @default(BOOKING)
+  totalAmount     Decimal      @db.Decimal(14, 2)
+  collectedAmount Decimal      @default(0) @db.Decimal(14, 2)
+  dueAmount       Decimal      @db.Decimal(14, 2)
+  receiptUrl      String?
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+
+  collections     Collection[]
+  demands         Demand[]
+  invoices        Invoice[]
+  documents       Document[]
+
+  @@index([leadId])
+  @@index([inventoryId])
+  @@index([stage])
+}
+
+model Collection {
+  id          String      @id @default(cuid())
+  receiptNo   String      @unique
+  bookingId   String
+  booking     Booking     @relation(fields: [bookingId], references: [id])
+  amount      Decimal     @db.Decimal(14, 2)
+  paymentMode PaymentMode
+  transRef    String?
+  chequeNo    String?
+  bankName    String?
+  paymentDate DateTime
+  notes       String?
+  receiptUrl  String?
+  createdById String
+  createdAt   DateTime    @default(now())
+
+  @@index([bookingId])
+  @@index([paymentDate])
+}
+
+model Demand {
+  id          String   @id @default(cuid())
+  demandNo    String   @unique
+  bookingId   String
+  booking     Booking  @relation(fields: [bookingId], references: [id])
+  milestoneName String
+  amount      Decimal  @db.Decimal(14, 2)
+  dueDate     DateTime
+  isPaid      Boolean  @default(false)
+  paidAt      DateTime?
+  noticeUrl   String?
+  sentVia     String[] // EMAIL, WHATSAPP, PDF
+  createdAt   DateTime @default(now())
+
+  @@index([bookingId])
+  @@index([dueDate])
+}
+
+model Invoice {
+  id          String      @id @default(cuid())
+  invoiceNo   String      @unique
+  bookingId   String
+  booking     Booking     @relation(fields: [bookingId], references: [id])
+  type        InvoiceType
+  amount      Decimal     @db.Decimal(14, 2)
+  gstAmount   Decimal?    @db.Decimal(14, 2)
+  totalAmount Decimal     @db.Decimal(14, 2)
+  pdfUrl      String?
+  invoiceDate DateTime    @default(now())
+  createdAt   DateTime    @default(now())
+
+  @@index([bookingId])
+  @@index([type])
+}
+
+model Document {
+  id          String   @id @default(cuid())
+  name        String
+  type        String   // AADHAAR, PAN, AGREEMENT, SALE_DEED, RECEIPT, KYC, OTHER
+  url         String
+  publicId    String   // Cloudinary public_id
+  leadId      String?
+  lead        Lead?    @relation(fields: [leadId], references: [id])
+  bookingId   String?
+  booking     Booking? @relation(fields: [bookingId], references: [id])
+  uploadedById String
+  createdAt   DateTime @default(now())
+
+  @@index([leadId])
+  @@index([bookingId])
+}
+
+model EmailTemplate {
+  id        String   @id @default(cuid())
+  name      String
+  subject   String
+  body      String   // HTML
+  type      String   // INTRODUCTION, PROJECT_DETAILS, etc.
+  projectId String?
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model WhatsAppTemplate {
+  id          String   @id @default(cuid())
+  name        String
+  templateId  String   // Meta template name
+  language    String   @default("en")
+  category    String
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+}
+
+model Notification {
+  id        String           @id @default(cuid())
+  userId    String
+  user      User             @relation(fields: [userId], references: [id])
+  type      NotificationType
+  title     String
+  body      String
+  isRead    Boolean          @default(false)
+  metadata  Json?
+  createdAt DateTime         @default(now())
+
+  @@index([userId])
+  @@index([isRead])
+}
+
+model ActivityLog {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  action    String
+  entity    String
+  entityId  String
+  details   Json?
+  ip        String?
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@index([entity])
+  @@index([createdAt])
+}
